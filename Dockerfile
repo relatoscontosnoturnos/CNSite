@@ -20,12 +20,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Instala dependências PHP
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Copia código do Laravel
+# Copia TUDO primeiro (muito importante!)
 COPY . .
+
+# Instala dependências PHP
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Permissões seguras
 RUN chown -R www-data:www-data /var/www/html && \
@@ -39,6 +38,7 @@ RUN chown -R www-data:www-data /var/www/html && \
 FROM node:18-alpine AS frontend
 
 WORKDIR /app
+
 COPY package.json package-lock.json vite.config.js ./
 RUN npm ci
 
@@ -51,19 +51,14 @@ RUN npm run build
 # ------------------------------------------------------------
 FROM caddy:2.7-alpine
 
-# Copia app
 COPY --from=base /var/www/html /var/www/html
-
-# Copia build front-end
 COPY --from=frontend /app/public/build /var/www/html/public/build
 
-# Copia config do Caddy
 COPY Caddyfile /etc/caddy/Caddyfile
 
-# Copia binário do PHP-FPM
+# Copia PHP-FPM binário
 COPY --from=php:8.2-fpm-alpine /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 
-# Executa como usuário não root
 USER 1000
 
 EXPOSE 8080
