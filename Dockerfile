@@ -59,7 +59,8 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Copia PHP-FPM binário
 COPY --from=php:8.2-fpm-alpine /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 
-USER 1000
+# Caddy precisa rodar como root no Render
+USER root
 
 EXPOSE 8080
 
