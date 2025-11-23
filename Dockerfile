@@ -12,8 +12,8 @@ RUN apk update && apk add --no-cache \
     icu-dev \
     zip unzip git curl bash
 
-# Apenas extensões necessárias (sem pdo_pgsql nem pdo_mysql)
-RUN docker-php-ext-install mbstring tokenizer xml gd intl
+# Extensões PHP necessárias (SEM tokenizer)
+RUN docker-php-ext-install mbstring xml gd intl
 
 # Composer seguro
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
