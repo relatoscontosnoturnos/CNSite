@@ -1,0 +1,20 @@
+:8080 {
+
+    encode gzip
+
+    root * /var/www/html/public
+
+    php_fastcgi 127.0.0.1:9000
+
+    file_server
+
+    @forbidden {
+        path /.env
+        path /storage/*
+        path /vendor/*
+        path /composer.*
+        path /artisan
+        path *.{log,env,md,yml}
+    }
+    respond @forbidden 403
+}
