@@ -51,6 +51,11 @@ RUN npm run build
 # ------------------------------------------------------------
 FROM caddy:2.7-alpine
 
+# Remove as capacidades de rede do executável Caddy.
+# Isso resolve o erro "operation not permitted" no Render,
+# pois o Caddy não precisará mais vincular-se a portas privilegiadas.
+RUN setcap -r /usr/bin/caddy
+
 COPY --from=base /var/www/html /var/www/html
 COPY --from=frontend /app/public/build /var/www/html/public/build
 
@@ -59,8 +64,9 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Copia PHP-FPM binário
 COPY --from=php:8.2-fpm-alpine /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 
-# Caddy precisa rodar como root no Render
-USER root
+# Não é necessário forçar 'USER root' após remover as capacidades.
+# O Caddy deve rodar com o usuário padrão (caddy) por segurança.
+# USER root (REMOVIDO)
 
 EXPOSE 8080
 
