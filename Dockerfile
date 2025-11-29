@@ -51,21 +51,22 @@ RUN npm run build
 # ------------------------------------------------------------
 FROM caddy:2.7-alpine
 
-# Copia app
-COPY --from=base /var/www/html /var/www/html
+# 1. Correção do Caddy (Já aplicada)
+RUN setcap -r /usr/bin/caddy
 
-# Copia build front-end
+COPY --from=base /var/www/html /var/www/html
 COPY --from=frontend /app/public/build /var/www/html/public/build
 
-# Copia config do Caddy
 COPY Caddyfile /etc/caddy/Caddyfile
 
-# Copia binário do PHP-FPM
+# Copia PHP-FPM binário
 COPY --from=php:8.2-fpm-alpine /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 
-# Executa como usuário não root
-USER 1000
+# NOVO: Copia o script de inicialização e o torna executável
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
 EXPOSE 8080
 
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+# NOVO: Altera o CMD para executar o script que inicia os dois serviços
+CMD ["/usr/local/bin/start.sh"]
