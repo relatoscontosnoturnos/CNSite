@@ -12,20 +12,19 @@ RUN apk update && apk add --no-cache \
     icu-dev \
     zip unzip git curl bash
 
-# Apenas extensões necessárias (sem pdo_pgsql nem pdo_mysql)
-RUN docker-php-ext-install mbstring tokenizer xml gd intl
+# Extensões PHP necessárias (SEM tokenizer)
+RUN docker-php-ext-install mbstring xml gd intl
 
 # Composer seguro
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Instala dependências PHP
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Copia código do Laravel
+# Copia TUDO primeiro (muito importante!)
 COPY . .
+
+# Instala dependências PHP
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Permissões seguras
 RUN chown -R www-data:www-data /var/www/html && \
@@ -39,6 +38,7 @@ RUN chown -R www-data:www-data /var/www/html && \
 FROM node:18-alpine AS frontend
 
 WORKDIR /app
+
 COPY package.json package-lock.json vite.config.js ./
 RUN npm ci
 
@@ -51,7 +51,13 @@ RUN npm run build
 # ------------------------------------------------------------
 FROM caddy:2.7-alpine
 
+<<<<<<< HEAD
 # 1. Correção do Caddy (Já aplicada)
+=======
+# Remove as capacidades de rede do executável Caddy.
+# Isso resolve o erro "operation not permitted" no Render,
+# pois o Caddy não precisará mais vincular-se a portas privilegiadas.
+>>>>>>> 0cf9ac8ec278d5c51d1e1c5f7d4015c2b6ab5ff5
 RUN setcap -r /usr/bin/caddy
 
 COPY --from=base /var/www/html /var/www/html
@@ -62,9 +68,15 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Copia PHP-FPM binário
 COPY --from=php:8.2-fpm-alpine /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 
+<<<<<<< HEAD
 # NOVO: Copia o script de inicialização e o torna executável
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
+=======
+# Não é necessário forçar 'USER root' após remover as capacidades.
+# O Caddy deve rodar com o usuário padrão (caddy) por segurança.
+# USER root (REMOVIDO)
+>>>>>>> 0cf9ac8ec278d5c51d1e1c5f7d4015c2b6ab5ff5
 
 EXPOSE 8080
 
