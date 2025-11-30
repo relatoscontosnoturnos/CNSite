@@ -1,60 +1,62 @@
 # ------------------------------------------------------------
-# ETAPA 1 — PHP-FPM + extensões + Composer
-# ------------------------------------------------------------
-FROM php:8.2-fpm-alpine AS php
-
-RUN apk update && apk add --no-cache \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    oniguruma-dev \
-    libxml2-dev \
-    freetype-dev \
-    icu-dev \
-    zip unzip git curl bash
-
-RUN docker-php-ext-install mbstring xml gd intl pdo pdo_mysql
-
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www/html
-COPY . .
-
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-RUN chmod -R 755 /var/www/html && \
-    chmod -R 770 storage bootstrap/cache
-
-
-# ------------------------------------------------------------
-# ETAPA 2 — Build do Vite (Node 22)
+# STAGE 1 — Build do Vite (Node 22)
 # ------------------------------------------------------------
 FROM node:22-alpine AS frontend
 
 WORKDIR /app
+
+# Copia arquivos base do front
 COPY package.json package-lock.json vite.config.js ./
+
+# Instala dependências
 RUN npm ci
 
-COPY resources resources
+# Copia as pastas que o Vite usa
+COPY resources ./resources
+COPY public ./public
+
+# Build final do front (gera public/build)
 RUN npm run build
 
 
 # ------------------------------------------------------------
-# ETAPA 3 — Contêiner final (PHP 8.2 + Apache)
+# STAGE 2 — PHP 8.2 + Apache (imagem estável)
 # ------------------------------------------------------------
-FROM webdevops/php-apache:8.2
+FROM php:8.2-apache
+
+# Instala libs necessárias para o Laravel funcionar
+RUN apt-get update && apt-get install -y \
+    libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libxml2-dev zip unzip git curl
+
+# Extensões PHP
+RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
+
+# Ativa mod_rewrite (OBRIGATÓRIO para Laravel)
+RUN a2enmod rewrite
+
+# Altera o DocumentRoot para /var/www/html/public
+RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf \
+    && sed -i 's|/var/www/|/var/www/html/public|g' /etc/apache2/apache2.conf
 
 WORKDIR /var/www/html
 
 # Copia código Laravel
 COPY . .
 
-# Copia o build do Vite
+# Copia o build do Vite gerado no Stage 1
 COPY --from=frontend /app/public/build /var/www/html/public/build
 
-# Instala dependências e ativa módulos
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-RUN a2enmod rewrite headers
+# Instala dependências PHP
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Permissões
-RUN chown -R application:application /var/www/html \
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Permissões Laravel
+RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache
+
+# Render usa a porta 8080 internamente
+EXPOSE 8080
+
+# Comando final
+CMD ["apache2-foreground"]
